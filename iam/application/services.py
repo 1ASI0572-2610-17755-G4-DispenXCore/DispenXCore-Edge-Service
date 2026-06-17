@@ -1,10 +1,13 @@
+import threading
 from datetime import datetime
 from iam.domain.entities import Device
 from iam.infrastructure.repositories import DeviceRepository
+from shared.infrastructure.backend_client import BackendClient
 
 class DeviceApplicationService:
     def __init__(self):
         self.repository = DeviceRepository()
+        self.backend_client = BackendClient()
 
     def registrar_dispositivo(self, device_id: str, mac_address: str, ip_address: str) -> dict:
         device = Device(
@@ -14,6 +17,15 @@ class DeviceApplicationService:
             last_seen=datetime.now()
         )
         saved_device = self.repository.save(device)
+
+        # Enviar al backend de forma asíncrona
+        thread = threading.Thread(
+            target=self.backend_client.registrar_dispositivo,
+            args=(device_id, mac_address, ip_address)
+        )
+        thread.daemon = True
+        thread.start()
+
         return {
             "status": "success",
             "message": "Dispositivo registrado/actualizado con éxito",

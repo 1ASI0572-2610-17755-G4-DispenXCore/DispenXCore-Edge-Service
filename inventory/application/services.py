@@ -1,14 +1,17 @@
+import threading
 from datetime import datetime
 from inventory.domain.entities import SensorReading
 from inventory.infrastructure.repositories import SensorRepository
 from inventory.infrastructure.hardware_sensors import ESP32SensorClient
 from iam.infrastructure.repositories import DeviceRepository
+from shared.infrastructure.backend_client import BackendClient
 
 class InventoryApplicationService:
     def __init__(self):
         self.sensor_repository = SensorRepository()
         self.device_repository = DeviceRepository()
         self.sensor_client = ESP32SensorClient()
+        self.backend_client = BackendClient()
 
     def registrar_lectura(self, device_id: str, sensor_type: str, value: float) -> dict:
         reading = SensorReading(
@@ -32,6 +35,15 @@ class InventoryApplicationService:
                 )
                 self.sensor_repository.save(reading)
                 saved_readings.append(reading.to_dict())
+
+        # Enviar al backend de forma asíncrona
+        thread = threading.Thread(
+            target=self.backend_client.enviar_telemetria,
+            args=(device_id, readings)
+        )
+        thread.daemon = True
+        thread.start()
+
         return {"status": "success", "readings": saved_readings}
 
     def obtener_telemetria_reciente(self, device_id: str) -> dict:
